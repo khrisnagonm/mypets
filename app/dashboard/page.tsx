@@ -45,7 +45,7 @@ export default function DashboardPage() {
     appointments,
     loading: appointmentsLoading,
     getTodayAppointments,
-    getUpcomingAppointments,
+    getAllRemindersSorted,
   } = useAppointments()
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -130,7 +130,7 @@ export default function DashboardPage() {
 
   const todayAppointments = getTodayAppointments()
   const next7DaysAppointments = getNext7DaysAppointments()
-  const upcomingReminders = getUpcomingAppointments(3)
+  const upcomingReminders = getAllRemindersSorted()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-orange-50">
