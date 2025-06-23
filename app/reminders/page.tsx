@@ -50,6 +50,7 @@ import { usePets } from "@/hooks/usePets"
 import { logoutUser } from "@/lib/auth"
 
 export default function RemindersPage() {
+  
   const { user, userProfile, loading: authLoading, isAuthenticated } = useAuth()
   const { appointments, loading: appointmentsLoading, createAppointment } = useAppointments()
   const { pets, loading: petsLoading } = usePets()
@@ -227,16 +228,40 @@ export default function RemindersPage() {
     return matchesSearch && matchesType && matchesStatus
   })
 
-  // Separate appointments by status
+  console.log("DEBUG: Contenido de 'appointments' (directo del hook):", appointments);
+  console.log("DEBUG: Contenido de 'filteredAppointments':", filteredAppointments);
+  console.log("DEBUG: Search Term:", searchTerm);
+  console.log("DEBUG: Selected Type:", selectedType);
+  console.log("DEBUG: Selected Status:", selectedStatus);
+
+
+  const now = new Date(); // Get current date and time
+  now.setHours(0, 0, 0, 0); // Set to start of today for consistent date comparison
+
+  // Separate appointments into categories
   const upcomingAppointments = filteredAppointments
     .filter((apt) => {
-      const aptDate = new Date(apt.date)
-      const today = new Date()
-      return aptDate >= today && (apt.status === "programada" || apt.status === "recordatorio")
+      const aptDate = new Date(apt.date);
+      return aptDate >= now && (apt.status === "programada" || apt.status === "recordatorio");
     })
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime()); // Sort by full date+time
+
+  const pastDueAppointments = filteredAppointments
+    .filter((apt) => {
+      const aptDate = new Date(apt.date);
+      // A past due appointment is one with a date before today AND not completed/cancelled
+      return aptDate < now && (apt.status === "programada" || apt.status === "recordatorio");
+    })
+    .sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime()); // Sort past due from newest to oldest
 
   const completedAppointments = filteredAppointments.filter((apt) => apt.status === "completada")
+    .sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime()); // Sort completed from newest to oldest
+
+
+    console.log("DEBUG: now (start of today):", now.toISOString());
+console.log("DEBUG: upcomingAppointments:", upcomingAppointments);
+console.log("DEBUG: pastDueAppointments:", pastDueAppointments); // <--- ESTE ES CLAVE!
+console.log("DEBUG: completedAppointments:", completedAppointments);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-orange-50">
@@ -500,13 +525,7 @@ export default function RemindersPage() {
                     <Skeleton className="h-8 w-8" />
                   ) : (
                     <p className="text-2xl font-bold text-red-700">
-                      {
-                        appointments.filter((apt) => {
-                          const aptDate = new Date(apt.date)
-                          const today = new Date()
-                          return aptDate < today && apt.status === "programada"
-                        }).length
-                      }
+                      {pastDueAppointments.length}
                     </p>
                   )}
                   <p className="text-xs text-red-600 mt-1">necesitan atención</p>
@@ -668,7 +687,71 @@ export default function RemindersPage() {
                 </CardContent>
               </Card>
             )}
+            {/* Past Due Appointments */}
+            {pastDueAppointments.length > 0 && (
+              <Card className="shadow-lg border-red-100">
+                <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50">
+                  <CardTitle className="flex items-center text-gray-800">
+                    <AlertCircle className="h-5 w-5 mr-2 text-red-600" />
+                    Recordatorios Atrasados ({pastDueAppointments.length})
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">Necesitan tu atención</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {pastDueAppointments.map((appointment) => (
+                      <div
+                        key={appointment.id}
+                        className="flex items-center space-x-4 p-4 border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg hover:from-red-100 hover:to-orange-100 transition-all"
+                      >
+                        <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+                          <AvatarImage src={`/placeholder.svg?height=48&width=48`} alt={appointment.petName} />
+                          <AvatarFallback className="bg-red-100 text-red-700 font-bold">
+                            {appointment.petName[0]}
+                          </AvatarFallback>
+                        </Avatar>
 
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h4 className="font-semibold text-gray-900">{appointment.petName}</h4>
+                            <Badge className={getTypeColor(appointment.type)}>
+                              {getTypeIcon(appointment.type)}
+                              <span className="ml-1 capitalize">{appointment.type}</span>
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium text-gray-900 mb-1">{appointment.title}</p>
+                          <p className="text-sm text-gray-600 mb-2">{appointment.description}</p>
+                          <div className="flex items-center space-x-4 text-xs text-gray-500">
+                            <span className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {appointment.date}
+                            </span>
+                            <span className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {appointment.time}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Button size="sm" variant="outline" className="border-green-200 hover:bg-green-50">
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Completar
+                          </Button>
+                          <Button size="sm" variant="outline" className="border-orange-200 hover:bg-orange-50">
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                          <Button size="sm" variant="outline" className="border-red-200 hover:bg-red-50">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             {/* Completed Appointments */}
             {completedAppointments.length > 0 && (
               <Card className="shadow-lg border-green-100">
